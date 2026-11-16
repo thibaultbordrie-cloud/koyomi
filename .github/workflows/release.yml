@@ -1,0 +1,36 @@
+name: release
+
+# Cross-compiles the binaries when a release is published and attaches them to it.
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: Build
+        env:
+          CGO_ENABLED: "0"
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          mkdir dist
+          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64; do
+            os="${target%/*}"; arch="${target#*/}"; name="koyomi-$TAG-$os-$arch"; bin=koyomi
+            if [ "$os" = windows ]; then bin=koyomi.exe; fi
+            mkdir "$name"
+            GOOS="$os" GOARCH="$arch" go build -trimpath -ldflags "-s -w" -o "$name/$bin" ./cmd/koyomi
+            cp README.md LICENSE "$name/"
+            if [ "$os" = windows ]; then zip -qr "dist/$name.zip" "$name"; else tar czf "dist/$name.tar.gz" "$name"; fi
+          done
+      - name: Upload
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" dist/* --clobber

@@ -1,0 +1,6 @@
+/site
+/koyomi
+/koyomi.exe
+/dist
+.env
+secrets.env
